@@ -67,6 +67,7 @@ public class Player : MonoBehaviour
     {
         if(Input.GetKeyDown(KeyCode.R))
         {
+            Time.timeScale = 1f;
             SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
         }
 
@@ -249,6 +250,7 @@ public class Player : MonoBehaviour
         {
             WinUI.gameObject.SetActive(true);
             Debug.LogWarning("!!!!! VICTORY COMPLETED !!!!! You touched the Goal mesh and won!");
+            Time.timeScale = 0f;
         }
     }
 }
@@ -370,6 +372,7 @@ public class Player : MonoBehaviour
         {
             Debug.LogError("Player has died.");
             LoseUI.gameObject.SetActive(true);
+            Time.timeScale = 0f;
         }
     }
 }
