@@ -9,7 +9,9 @@ public class EnemyAndLevelManager : MonoBehaviour
         Spikes,
         Lava,
         MovingPlatform,
-        Dripstone
+        Dripstone,
+        Void,
+        Goal
     }
 
     [System.Serializable]
@@ -80,6 +82,8 @@ public class EnemyAndLevelManager : MonoBehaviour
     public Color lavaColor = new Color(1f, 0.25f, 0f);      
     public Color movingPlatformColor = Color.green;         
     public Color dripstoneColor = new Color(0.5f, 0.35f, 0.25f); 
+    public Color voidColor = new Color(0.1f, 0.05f, 0.15f, 0.5f);
+    public Color goalColor = Color.yellow;                       
 
     [Header("Enemy Configuration")]
     public int enemyCount = 5;
@@ -174,6 +178,11 @@ public class EnemyAndLevelManager : MonoBehaviour
                             if (hitId == cachedPlayerId)
                             {
                                 Debug.LogWarning("[CRUSHED] Player hit by Dripstone");
+                                Player playerInstance = Object.FindFirstObjectByType<Player>();
+                                if (playerInstance != null)
+                                {
+                                    playerInstance.TakeDamage(playerInstance.damage, "Dripstone");
+                                }
                             }
                         }
                         collided = true;
@@ -234,6 +243,8 @@ public class EnemyAndLevelManager : MonoBehaviour
                 case PlatformType.Lava: platformColor = lavaColor; break;
                 case PlatformType.MovingPlatform: platformColor = movingPlatformColor; break;
                 case PlatformType.Dripstone: platformColor = dripstoneColor; break;
+                case PlatformType.Void: platformColor = voidColor; break; 
+                case PlatformType.Goal: platformColor = goalColor; break;
                 default:
                     float t = (pos.x - minX) / rangeX;
                     platformColor = Color.Lerp(gradientStartColor, gradientEndColor, t);
@@ -272,12 +283,11 @@ public class EnemyAndLevelManager : MonoBehaviour
 
         if (normalPlatforms.Count == 0)
         {
-            Debug.LogError("[Enemy Generator] Cannot spawn enemies because there are no Normal platform");
+            Debug.LogError("[Enemy Generator] Cannot spawn enemies because there are no Normal platforms");
             return;
         }
 
         List<Vector3> spawnedPositions = new List<Vector3>();
-
         float minSpawnSeparation = enemyScale.x * 2.5f; 
 
         for (int i = 0; i < enemyCount; i++)
@@ -375,6 +385,11 @@ public class EnemyAndLevelManager : MonoBehaviour
                     if (hitId == cachedPlayerId)
                     {
                         Debug.LogWarning($"[ENEMY] Hit player ID {cachedPlayerId}");
+                        Player playerInstance = Object.FindFirstObjectByType<Player>();
+                        if (playerInstance != null)
+                        {
+                            playerInstance.TakeDamage(playerInstance.damage, "Enemy");
+                        }
                     }
                     else
                     {
@@ -438,7 +453,7 @@ public class EnemyAndLevelManager : MonoBehaviour
                 }
             }
 
-            platformPropertyBlock.SetVectorArray(name: "_Color", topColors); 
+            platformPropertyBlock.SetVectorArray("_Color", topColors); 
             platformPropertyBlock.SetVectorArray("_ColorBottom", bottomColors); 
             Graphics.DrawMeshInstanced(cubeMesh, 0, instancedMaterial, batchMatrices, count, platformPropertyBlock); 
         }
@@ -458,6 +473,18 @@ public class EnemyAndLevelManager : MonoBehaviour
             enemyPropertyBlock.SetVectorArray("_Color", enemyCols);
             enemyPropertyBlock.SetVectorArray("_ColorBottom", enemyCols); 
             Graphics.DrawMeshInstanced(cubeMesh, 0, instancedMaterial, batchMatrices, count, enemyPropertyBlock); 
+        }
+    }
+
+    public void DestroyEnemy(int enemyColliderId)
+    {
+        int index = enemies.FindIndex(e => e.colliderId == enemyColliderId);
+        if (index != -1)
+        {
+            Debug.Log($"[MANAGER] Destroying Enemy ID: {enemyColliderId}");
+            CollisionManager.Instance.RemoveCollider(enemyColliderId);
+            enemies.RemoveAt(index);
+            enemyColliderIds.Remove(enemyColliderId);
         }
     }
 
@@ -506,5 +533,10 @@ public class EnemyAndLevelManager : MonoBehaviour
     public void SetPlayerID(int playerID)
     {
         cachedPlayerId = playerID;
+    }
+
+    public bool IsEnemyCollider(int colliderId)
+    {
+        return enemyColliderIds.Contains(colliderId);
     }
 }
