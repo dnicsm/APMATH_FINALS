@@ -29,7 +29,7 @@ public class Player : MonoBehaviour
     public float CurrentHealth;
 
     private float baseSpeed = 5f;
-    private float jumpForce = 12f;
+    private float jumpForce = 15f;
     private float upwardGravity = 35f;
     private float downwardGravity = 15f;
     

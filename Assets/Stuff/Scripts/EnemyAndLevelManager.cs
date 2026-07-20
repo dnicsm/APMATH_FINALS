@@ -34,8 +34,8 @@ public class EnemyAndLevelManager : MonoBehaviour
     [System.Serializable]
     public struct PlatformData
     {
-        public Vector3 startPosition;   
-        public Vector3 currentPosition; 
+        public Vector3 startPosition;
+        public Vector3 currentPosition;
         public Vector3 scale;
         public Color color;
         public int colliderId;
@@ -70,7 +70,13 @@ public class EnemyAndLevelManager : MonoBehaviour
 
     [Header("Rendering Setup")]
     public Material instancedMaterial;
-    public float constantZPosition = 1f; 
+    public float constantZPosition = 1f;
+
+    [Header("Void & Fall Settings")]
+    public bool autoGenerateVoidFloor = true;
+    public float voidYOffset = 4f;
+    public float voidExtraWidth = 30f;
+    public float killYThreshold = -15f;
 
     [Header("Manual Level Design")]
     public List<LevelDesignPreset> customLevelDesign = new List<LevelDesignPreset>();
@@ -78,30 +84,43 @@ public class EnemyAndLevelManager : MonoBehaviour
     [Header("Visual Colors for Types")]
     public Color gradientStartColor = Color.blue;
     public Color gradientEndColor = Color.cyan;
-    public Color spikeColor = new Color(0.4f, 0.4f, 0.45f); 
-    public Color lavaColor = new Color(1f, 0.25f, 0f);      
-    public Color movingPlatformColor = Color.green;         
-    public Color dripstoneColor = new Color(0.5f, 0.35f, 0.25f); 
+    public Color spikeColor = new Color(0.4f, 0.4f, 0.45f);
+    public Color lavaColor = new Color(1f, 0.25f, 0f);
+    public Color movingPlatformColor = Color.green;
+    public Color dripstoneColor = new Color(0.5f, 0.35f, 0.25f);
     public Color voidColor = new Color(0.1f, 0.05f, 0.15f, 0.5f);
-    public Color goalColor = Color.yellow;                       
+    public Color goalColor = Color.yellow;
 
     [Header("Enemy Configuration")]
-    public int enemyCount = 5;
     public float enemySpeed = 3f;
     public Vector3 enemyScale = new Vector3(0.5f, 0.5f, 0.5f);
     public Color[] enemyColors = new Color[] { Color.red, Color.magenta, new Color(1f, 0.5f, 0f) };
 
-    private List<PlatformData> platforms = new List<PlatformData>();
-    private List<EnemyData> enemies = new List<EnemyData>();
-    private Dictionary<int, PlatformType> platformColliderMap = new Dictionary<int, PlatformType>();
-    private HashSet<int> enemyColliderIds = new HashSet<int>();
+    [Header("Enemy Spawning Rules")]
+    public float minPlatformWidthForEnemies = 8.0f;
+    public int maxEnemiesPerPlatform = 2;
+
+    private readonly List<PlatformData> platforms = new List<PlatformData>();
+    private readonly List<EnemyData> enemies = new List<EnemyData>();
+    private readonly Dictionary<int, PlatformType> platformColliderMap = new Dictionary<int, PlatformType>();
+    private readonly Dictionary<int, int> platformColliderToIndex = new Dictionary<int, int>();
+    private readonly HashSet<int> enemyColliderIds = new HashSet<int>();
 
     private Mesh cubeMesh;
     private MaterialPropertyBlock platformPropertyBlock;
     private MaterialPropertyBlock enemyPropertyBlock;
-    private int cachedPlayerId = -1;
 
-    void Start()
+    private Matrix4x4[] platformMatrices;
+    private Vector4[] platformTopColors;
+    private Vector4[] platformBottomColors;
+
+    private Matrix4x4[] enemyMatrices;
+    private Vector4[] enemyColorsBuffer;
+
+    private int cachedPlayerId = -1;
+    private Player playerInstance;
+
+    private void Start()
     {
         if (instancedMaterial != null && !instancedMaterial.enableInstancing)
         {
@@ -114,99 +133,55 @@ public class EnemyAndLevelManager : MonoBehaviour
 
         GenerateGradientPlatforms();
         GenerateEnemies();
+
+        playerInstance = Object.FindAnyObjectByType<Player>();
     }
 
-    void Update()
+    private void Update()
     {
-        UpdatePlatforms(); 
+        UpdatePlatforms();
         UpdateEnemies();
+        CheckPlayerVoidFall();
         RenderAll();
     }
 
-    void UpdatePlatforms()
+    #region Platform Logic
+    public Vector3 GetPlatformDelta(int platformColliderId)
     {
+        if (platformColliderToIndex.TryGetValue(platformColliderId, out int index))
+        {
+            PlatformData plat = platforms[index];
+            if (plat.type == PlatformType.MovingPlatform)
+            {
+                Vector3 prevPos = plat.currentPosition;
+                float pingPong = Mathf.PingPong(Time.time * plat.travelSpeed, 1f);
+                Vector3 nextPos = Vector3.Lerp(plat.startPosition, plat.startPosition + plat.travelOffset, pingPong);
+                return nextPos - prevPos;
+            }
+        }
+        return Vector3.zero;
+    }
+
+    private void UpdatePlatforms()
+    {
+        float deltaTime = Time.deltaTime;
+        float currentTime = Time.time;
+
         for (int i = 0; i < platforms.Count; i++)
         {
             PlatformData plat = platforms[i];
 
-            if (plat.type == PlatformType.MovingPlatform)
+            if (i < customLevelDesign.Count && plat.type != PlatformType.MovingPlatform && plat.type != PlatformType.Dripstone)
             {
-                float pingPong = Mathf.PingPong(Time.time * plat.travelSpeed, 1f);
-                plat.currentPosition = Vector3.Lerp(plat.startPosition, plat.startPosition + plat.travelOffset, pingPong);
-                plat.matrix = Matrix4x4.TRS(plat.currentPosition, Quaternion.identity, plat.scale);
+                SyncInspectorPlatform(ref plat, customLevelDesign[i]);
+            }
+            else if (plat.type == PlatformType.MovingPlatform)
+            {
+                UpdateMovingPlatform(ref plat, currentTime);
             }
             else if (plat.type == PlatformType.Dripstone)
             {
-                if (plat.isRespawning)
-                {
-                    plat.timer += Time.deltaTime;
-
-                    plat.matrix = Matrix4x4.TRS(plat.startPosition, Quaternion.identity, Vector3.zero);
-                    CollisionManager.Instance.UpdateCollider(plat.colliderId, plat.startPosition, Vector3.zero);
-
-                    if (plat.timer >= plat.dropDelay)
-                    {
-                        plat.isRespawning = false;
-                        plat.isFalling = false;
-                        plat.timer = 0f; 
-                        plat.currentPosition = plat.startPosition;
-                    }
-                }
-                else if (!plat.isFalling)
-                {
-                    plat.timer += Time.deltaTime;
-                    if (plat.timer >= plat.dropDelay)
-                    {
-                        plat.isFalling = true;
-                        plat.currentFallSpeed = 0f;
-                    }
-                    plat.currentPosition = plat.startPosition;
-                    plat.matrix = Matrix4x4.TRS(plat.currentPosition, Quaternion.identity, plat.scale);
-                    CollisionManager.Instance.UpdateCollider(plat.colliderId, plat.currentPosition, plat.scale);
-                }
-                else
-                {
-                    plat.currentFallSpeed += plat.gravityScale * Time.deltaTime;
-                    Vector3 proposedPos = plat.currentPosition - new Vector3(0f, plat.currentFallSpeed * Time.deltaTime, 0f);
-
-                    bool collided = false;
-
-                    if (CollisionManager.Instance.CheckCollision(plat.colliderId, proposedPos, out List<int> collidingIds))
-                    {
-                        foreach (int hitId in collidingIds)
-                        {
-                            if (hitId == cachedPlayerId)
-                            {
-                                Debug.LogWarning("[CRUSHED] Player hit by Dripstone");
-                                Player playerInstance = Object.FindFirstObjectByType<Player>();
-                                if (playerInstance != null)
-                                {
-                                    playerInstance.TakeDamage(playerInstance.damage, "Dripstone");
-                                }
-                            }
-                        }
-                        collided = true;
-                    }
-                    else if (Vector3.Distance(plat.startPosition, proposedPos) >= plat.maxFallDistance)
-                    {
-                        collided = true;
-                    }
-
-                    if (collided)
-                    {
-                        plat.isRespawning = true;
-                        plat.timer = 0f; 
-
-                        plat.matrix = Matrix4x4.TRS(plat.startPosition, Quaternion.identity, Vector3.zero);
-                        CollisionManager.Instance.UpdateCollider(plat.colliderId, plat.startPosition, Vector3.zero);
-                    }
-                    else
-                    {
-                        plat.currentPosition = proposedPos;
-                        plat.matrix = Matrix4x4.TRS(plat.currentPosition, Quaternion.identity, plat.scale);
-                        CollisionManager.Instance.UpdateCollider(plat.colliderId, plat.currentPosition, plat.scale);
-                    }
-                }
+                UpdateDripstonePlatform(ref plat, deltaTime);
             }
 
             CollisionManager.Instance.UpdateMatrix(plat.colliderId, plat.matrix);
@@ -214,157 +189,308 @@ public class EnemyAndLevelManager : MonoBehaviour
         }
     }
 
-    void GenerateGradientPlatforms()
+    private void SyncInspectorPlatform(ref PlatformData plat, LevelDesignPreset preset)
+    {
+        Vector3 desiredPos = preset.localPosition;
+        desiredPos.z = constantZPosition;
+        Vector3 desiredScale = preset.scale;
+
+        if (plat.currentPosition != desiredPos || plat.scale != desiredScale)
+        {
+            plat.startPosition = desiredPos;
+            plat.currentPosition = desiredPos;
+            plat.scale = desiredScale;
+            plat.matrix = Matrix4x4.TRS(desiredPos, Quaternion.identity, plat.scale);
+
+            CollisionManager.Instance.UpdateCollider(plat.colliderId, desiredPos, plat.scale);
+        }
+    }
+
+    private void UpdateMovingPlatform(ref PlatformData plat, float currentTime)
+    {
+        float pingPong = Mathf.PingPong(currentTime * plat.travelSpeed, 1f);
+        plat.currentPosition = Vector3.Lerp(plat.startPosition, plat.startPosition + plat.travelOffset, pingPong);
+        plat.matrix = Matrix4x4.TRS(plat.currentPosition, Quaternion.identity, plat.scale);
+
+        CollisionManager.Instance.UpdateCollider(plat.colliderId, plat.currentPosition, plat.scale);
+    }
+
+    private void UpdateDripstonePlatform(ref PlatformData plat, float deltaTime)
+    {
+        if (plat.isRespawning)
+        {
+            plat.timer += deltaTime;
+            plat.matrix = Matrix4x4.TRS(plat.startPosition, Quaternion.identity, Vector3.zero);
+            CollisionManager.Instance.UpdateCollider(plat.colliderId, plat.startPosition, Vector3.zero);
+
+            if (plat.timer >= plat.dropDelay)
+            {
+                plat.isRespawning = false;
+                plat.isFalling = false;
+                plat.timer = 0f;
+                plat.currentPosition = plat.startPosition;
+            }
+            return;
+        }
+
+        if (!plat.isFalling)
+        {
+            plat.timer += deltaTime;
+            if (plat.timer >= plat.dropDelay)
+            {
+                plat.isFalling = true;
+                plat.currentFallSpeed = 0f;
+            }
+            plat.currentPosition = plat.startPosition;
+            plat.matrix = Matrix4x4.TRS(plat.currentPosition, Quaternion.identity, plat.scale);
+            CollisionManager.Instance.UpdateCollider(plat.colliderId, plat.currentPosition, plat.scale);
+            return;
+        }
+
+        plat.currentFallSpeed += plat.gravityScale * deltaTime;
+        Vector3 proposedPos = plat.currentPosition - new Vector3(0f, plat.currentFallSpeed * deltaTime, 0f);
+
+        bool collided = false;
+
+        if (CollisionManager.Instance.CheckCollision(plat.colliderId, proposedPos, out List<int> collidingIds))
+        {
+            foreach (int hitId in collidingIds)
+            {
+                if (hitId == cachedPlayerId)
+                {
+                    playerInstance?.TakeDamage(playerInstance.damage, "Dripstone");
+                }
+            }
+            collided = true;
+        }
+        else if (Vector3.Distance(plat.startPosition, proposedPos) >= plat.maxFallDistance)
+        {
+            collided = true;
+        }
+
+        if (collided)
+        {
+            plat.isRespawning = true;
+            plat.timer = 0f;
+            plat.matrix = Matrix4x4.TRS(plat.startPosition, Quaternion.identity, Vector3.zero);
+            CollisionManager.Instance.UpdateCollider(plat.colliderId, plat.startPosition, Vector3.zero);
+        }
+        else
+        {
+            plat.currentPosition = proposedPos;
+            plat.matrix = Matrix4x4.TRS(plat.currentPosition, Quaternion.identity, plat.scale);
+            CollisionManager.Instance.UpdateCollider(plat.colliderId, plat.currentPosition, plat.scale);
+        }
+    }
+    #endregion
+
+    #region Generation
+    private void GenerateGradientPlatforms()
     {
         if (customLevelDesign == null || customLevelDesign.Count == 0) return;
 
-        float minX = float.MaxValue;
-        float maxX = float.MinValue;
-        foreach (var preset in customLevelDesign)
-        {
-            if (preset.localPosition.x < minX) minX = preset.localPosition.x;
-            if (preset.localPosition.x > maxX) maxX = preset.localPosition.x;
-        }
-
+        CalculateLevelBounds(out float minX, out float maxX, out float minY);
         float rangeX = Mathf.Max(0.1f, maxX - minX);
 
         for (int i = 0; i < customLevelDesign.Count; i++)
         {
-            Vector3 pos = customLevelDesign[i].localPosition;
-            pos.z = constantZPosition; 
+            LevelDesignPreset preset = customLevelDesign[i];
+            Vector3 pos = preset.localPosition;
+            pos.z = constantZPosition;
 
-            Vector3 scale = customLevelDesign[i].scale;
-            PlatformType pType = customLevelDesign[i].type;
-
-            Color platformColor;
-            switch (pType)
-            {
-                case PlatformType.Spikes: platformColor = spikeColor; break;
-                case PlatformType.Lava: platformColor = lavaColor; break;
-                case PlatformType.MovingPlatform: platformColor = movingPlatformColor; break;
-                case PlatformType.Dripstone: platformColor = dripstoneColor; break;
-                case PlatformType.Void: platformColor = voidColor; break; 
-                case PlatformType.Goal: platformColor = goalColor; break;
-                default:
-                    float t = (pos.x - minX) / rangeX;
-                    platformColor = Color.Lerp(gradientStartColor, gradientEndColor, t);
-                    break;
-            }
-
-            int id = CollisionManager.Instance.RegisterCollider(pos, scale, isPlayer: false);
+            Color platformColor = GetPlatformColor(preset.type, pos.x, minX, rangeX);
+            int id = CollisionManager.Instance.RegisterCollider(pos, preset.scale, isPlayer: false);
 
             PlatformData newPlatform = new PlatformData
             {
                 startPosition = pos,
                 currentPosition = pos,
-                scale = scale,
+                scale = preset.scale,
                 color = platformColor,
                 colliderId = id,
-                matrix = Matrix4x4.TRS(pos, Quaternion.identity, scale),
-                type = pType,
-                travelOffset = customLevelDesign[i].travelOffset,
-                travelSpeed = customLevelDesign[i].travelSpeed,
-                dropDelay = customLevelDesign[i].dropDelay,
-                gravityScale = customLevelDesign[i].gravityScale,
-                maxFallDistance = customLevelDesign[i].maxFallDistance,
+                matrix = Matrix4x4.TRS(pos, Quaternion.identity, preset.scale),
+                type = preset.type,
+                travelOffset = preset.travelOffset,
+                travelSpeed = preset.travelSpeed,
+                dropDelay = preset.dropDelay,
+                gravityScale = preset.gravityScale,
+                maxFallDistance = preset.maxFallDistance,
                 timer = 0f,
                 isFalling = false
             };
 
             CollisionManager.Instance.UpdateMatrix(id, newPlatform.matrix);
             platforms.Add(newPlatform);
-            platformColliderMap[id] = pType;
+            
+            int index = platforms.Count - 1;
+            platformColliderMap[id] = preset.type;
+            platformColliderToIndex[id] = index;
+        }
+
+        if (autoGenerateVoidFloor)
+        {
+            GenerateVoidFloor(minX, maxX, minY);
         }
     }
 
-    void GenerateEnemies()
+    private void GenerateVoidFloor(float minX, float maxX, float minY)
     {
-        List<PlatformData> normalPlatforms = platforms.FindAll(p => p.type == PlatformType.Normal);
+        float voidThickness = 50f;
+        float voidY = minY - voidYOffset - (voidThickness * 0.5f);
+        float totalWidth = (maxX - minX) + voidExtraWidth;
 
-        if (normalPlatforms.Count == 0)
+        Vector3 voidPos = new Vector3((minX + maxX) * 0.5f, voidY, constantZPosition);
+        Vector3 voidScale = new Vector3(totalWidth, voidThickness, 1f);
+
+        int voidId = CollisionManager.Instance.RegisterCollider(voidPos, voidScale, isPlayer: false);
+
+        PlatformData voidFloor = new PlatformData
         {
-            Debug.LogError("[Enemy Generator] Cannot spawn enemies because there are no Normal platforms");
-            return;
+            startPosition = voidPos,
+            currentPosition = voidPos,
+            scale = voidScale,
+            color = voidColor,
+            colliderId = voidId,
+            matrix = Matrix4x4.TRS(voidPos, Quaternion.identity, voidScale),
+            type = PlatformType.Void
+        };
+
+        CollisionManager.Instance.UpdateMatrix(voidId, voidFloor.matrix);
+        platforms.Add(voidFloor);
+
+        int index = platforms.Count - 1;
+        platformColliderMap[voidId] = PlatformType.Void;
+        platformColliderToIndex[voidId] = index;
+
+        killYThreshold = minY - voidYOffset;
+    }
+
+    private void CalculateLevelBounds(out float minX, out float maxX, out float minY)
+    {
+        minX = float.MaxValue;
+        maxX = float.MinValue;
+        minY = float.MaxValue;
+
+        foreach (var preset in customLevelDesign)
+        {
+            if (preset.localPosition.x < minX) minX = preset.localPosition.x;
+            if (preset.localPosition.x > maxX) maxX = preset.localPosition.x;
+            if (preset.localPosition.y < minY) minY = preset.localPosition.y;
         }
+    }
 
-        List<Vector3> spawnedPositions = new List<Vector3>();
-        float minSpawnSeparation = enemyScale.x * 2.5f; 
-
-        for (int i = 0; i < enemyCount; i++)
+    private Color GetPlatformColor(PlatformType type, float xPos, float minX, float rangeX)
+    {
+        return type switch
         {
-            Vector3 enemyPos = Vector3.zero;
-            PlatformData spawnPlat;
-            bool foundValidSpot = false;
-            int attempts = 0;
+            PlatformType.Spikes => spikeColor,
+            PlatformType.Lava => lavaColor,
+            PlatformType.MovingPlatform => movingPlatformColor,
+            PlatformType.Dripstone => dripstoneColor,
+            PlatformType.Void => voidColor,
+            PlatformType.Goal => goalColor,
+            _ => Color.Lerp(gradientStartColor, gradientEndColor, (xPos - minX) / rangeX)
+        };
+    }
+    #endregion
 
-            float halfEnemyWidth = enemyScale.x * 0.5f;
-            float minX = 0f;
-            float maxX = 0f;
+    #region Enemy Logic
+    private void GenerateEnemies()
+    {
+        enemies.Clear();
+        enemyColliderIds.Clear();
 
-            while (!foundValidSpot && attempts < 15)
+        foreach (PlatformData plat in platforms)
+        {
+            if (plat.type != PlatformType.Normal || plat.scale.x < minPlatformWidthForEnemies) 
+                continue;
+
+            float platformHalfWidth = plat.scale.x * 0.5f;
+            float platformTopY = plat.currentPosition.y + (plat.scale.y * 0.5f) + (enemyScale.y * 0.5f) + 0.05f;
+            float usableHalfWidth = Mathf.Max(0.5f, platformHalfWidth - 0.8f);
+
+            for (int i = 0; i < maxEnemiesPerPlatform; i++)
             {
-                attempts++;
-                spawnPlat = normalPlatforms[Random.Range(0, normalPlatforms.Count)];
-                float halfPlatWidth = spawnPlat.scale.x * 0.5f;
+                float preferredX = (i == 0) ? -usableHalfWidth * 0.5f : usableHalfWidth * 0.5f;
+                float[] xOffsetsToTry = { preferredX, preferredX - 0.5f, preferredX + 0.5f, preferredX - 1.0f, preferredX + 1.0f, 0f };
 
-                minX = spawnPlat.currentPosition.x - halfPlatWidth + halfEnemyWidth;
-                maxX = spawnPlat.currentPosition.x + halfPlatWidth - halfEnemyWidth;
-
-                float randomOffsetX = Random.Range(-halfPlatWidth + halfEnemyWidth, halfPlatWidth - halfEnemyWidth);
-                enemyPos = spawnPlat.currentPosition + new Vector3(randomOffsetX, (spawnPlat.scale.y * 0.5f) + (enemyScale.y * 0.5f) + 0.05f, 0);
-                enemyPos.z = constantZPosition;
-
-                bool tooClose = false;
-                foreach (Vector3 existingPos in spawnedPositions)
+                foreach (float xOffset in xOffsetsToTry)
                 {
-                    if (Vector3.Distance(enemyPos, existingPos) < minSpawnSeparation)
+                    if (Mathf.Abs(xOffset) > usableHalfWidth) continue;
+
+                    Vector3 candidatePos = new Vector3(plat.currentPosition.x + xOffset, platformTopY, constantZPosition);
+
+                    if (IsSpawnPositionSafe(candidatePos, plat.colliderId))
                     {
-                        tooClose = true;
+                        CreateEnemy(candidatePos, plat);
                         break;
                     }
                 }
-
-                if (!tooClose)
-                {
-                    foundValidSpot = true;
-                }
             }
-
-            int id = CollisionManager.Instance.RegisterCollider(enemyPos, enemyScale, isPlayer: false);
-
-            float randomizedSpeed = enemySpeed * Random.Range(0.8f, 1.2f);
-            float dir = Random.value > 0.5f ? 1f : -1f;
-            Color enemyColor = enemyColors[Random.Range(0, enemyColors.Length)];
-
-            EnemyData newEnemy = new EnemyData
-            {
-                position = enemyPos,
-                scale = enemyScale,
-                speed = randomizedSpeed, 
-                direction = dir,
-                color = enemyColor,
-                colliderId = id,
-                matrix = Matrix4x4.TRS(enemyPos, Quaternion.identity, enemyScale),
-                minPatrolX = minX,
-                maxPatrolX = maxX
-            };
-
-            CollisionManager.Instance.UpdateMatrix(id, newEnemy.matrix);
-            enemies.Add(newEnemy);
-            enemyColliderIds.Add(id);
-            spawnedPositions.Add(enemyPos);
         }
     }
 
-    void UpdateEnemies()
+    private bool IsSpawnPositionSafe(Vector3 candidatePos, int parentPlatformId)
     {
+        int tempId = CollisionManager.Instance.RegisterCollider(candidatePos, enemyScale, isPlayer: false);
+        bool safe = true;
+
+        if (CollisionManager.Instance.CheckCollision(tempId, candidatePos, out List<int> hitIds))
+        {
+            foreach (int hitId in hitIds)
+            {
+                if (hitId == parentPlatformId) continue;
+
+                if (platformColliderMap.TryGetValue(hitId, out PlatformType hitType))
+                {
+                    if (hitType == PlatformType.Lava || hitType == PlatformType.Spikes ||
+                        hitType == PlatformType.Dripstone || hitType == PlatformType.Void)
+                    {
+                        safe = false;
+                        break;
+                    }
+                }
+            }
+        }
+
+        CollisionManager.Instance.RemoveCollider(tempId);
+        return safe;
+    }
+
+    private void CreateEnemy(Vector3 spawnPos, PlatformData plat)
+    {
+        int id = CollisionManager.Instance.RegisterCollider(spawnPos, enemyScale, isPlayer: false);
+        float halfPlatWidth = plat.scale.x * 0.5f;
+        float halfEnemyWidth = enemyScale.x * 0.5f;
+
+        EnemyData newEnemy = new EnemyData
+        {
+            position = spawnPos,
+            scale = enemyScale,
+            speed = enemySpeed * Random.Range(0.8f, 1.2f),
+            direction = Random.value > 0.5f ? 1f : -1f,
+            color = enemyColors[Random.Range(0, enemyColors.Length)],
+            colliderId = id,
+            matrix = Matrix4x4.TRS(spawnPos, Quaternion.identity, enemyScale),
+            minPatrolX = plat.currentPosition.x - halfPlatWidth + halfEnemyWidth,
+            maxPatrolX = plat.currentPosition.x + halfPlatWidth - halfEnemyWidth
+        };
+
+        CollisionManager.Instance.UpdateMatrix(id, newEnemy.matrix);
+        enemies.Add(newEnemy);
+        enemyColliderIds.Add(id);
+    }
+
+    private void UpdateEnemies()
+    {
+        float deltaTime = Time.deltaTime;
+
         for (int i = 0; i < enemies.Count; i++)
         {
             EnemyData enemy = enemies[i];
 
-            float step = enemy.speed * enemy.direction * Time.deltaTime;
+            float step = enemy.speed * enemy.direction * deltaTime;
             Vector3 targetPosition = enemy.position + new Vector3(step, 0, 0);
-
             bool needsToTurnAround = false;
 
             if (targetPosition.x <= enemy.minPatrolX)
@@ -384,26 +510,17 @@ public class EnemyAndLevelManager : MonoBehaviour
                 {
                     if (hitId == cachedPlayerId)
                     {
-                        Debug.LogWarning($"[ENEMY] Hit player ID {cachedPlayerId}");
-                        Player playerInstance = Object.FindFirstObjectByType<Player>();
-                        if (playerInstance != null)
-                        {
-                            playerInstance.TakeDamage(playerInstance.damage, "Enemy");
-                        }
+                        playerInstance?.TakeDamage(playerInstance.damage, "Enemy");
                     }
-                    else
+                    else if (!enemyColliderIds.Contains(hitId))
                     {
-                        EnemyAndLevelManager.PlatformType type;
-                        if (!enemyColliderIds.Contains(hitId)) 
-                        {
-                            if (platformColliderMap.TryGetValue(hitId, out type))
-                            {
-                                PlatformData plat = platforms.Find(p => p.colliderId == hitId);
 
-                                if (Mathf.Abs(plat.currentPosition.y - enemy.position.y) < (plat.scale.y * 0.5f + enemy.scale.y * 0.5f - 0.05f))
-                                {
-                                    needsToTurnAround = true;
-                                }
+                        if (platformColliderToIndex.TryGetValue(hitId, out int platIndex))
+                        {
+                            PlatformData plat = platforms[platIndex];
+                            if (Mathf.Abs(plat.currentPosition.y - enemy.position.y) < (plat.scale.y * 0.5f + enemy.scale.y * 0.5f - 0.05f))
+                            {
+                                needsToTurnAround = true;
                             }
                         }
                     }
@@ -412,8 +529,8 @@ public class EnemyAndLevelManager : MonoBehaviour
 
             if (needsToTurnAround)
             {
-                enemy.direction *= -1f; 
-                targetPosition = enemy.position + new Vector3(enemy.speed * enemy.direction * Time.deltaTime, 0, 0);
+                enemy.direction *= -1f;
+                targetPosition = enemy.position + new Vector3(enemy.speed * enemy.direction * deltaTime, 0, 0);
             }
 
             enemy.position = targetPosition;
@@ -426,74 +543,106 @@ public class EnemyAndLevelManager : MonoBehaviour
         }
     }
 
-    void RenderAll()
-    {
-        if (cubeMesh == null || instancedMaterial == null) return;
-
-        if (platforms.Count > 0)
-        {
-            int count = platforms.Count;
-            Matrix4x4[] batchMatrices = new Matrix4x4[count];
-            Vector4[] topColors = new Vector4[count]; 
-            Vector4[] bottomColors = new Vector4[count]; 
-
-            for (int i = 0; i < count; i++)
-            {
-                batchMatrices[i] = platforms[i].matrix;
-                
-                if (platforms[i].type == PlatformType.Normal)
-                {
-                    topColors[i] = gradientStartColor;
-                    bottomColors[i] = gradientEndColor;
-                }
-                else 
-                {
-                    topColors[i] = platforms[i].color;
-                    bottomColors[i] = platforms[i].color;
-                }
-            }
-
-            platformPropertyBlock.SetVectorArray("_Color", topColors); 
-            platformPropertyBlock.SetVectorArray("_ColorBottom", bottomColors); 
-            Graphics.DrawMeshInstanced(cubeMesh, 0, instancedMaterial, batchMatrices, count, platformPropertyBlock); 
-        }
-
-        if (enemies.Count > 0)
-        {
-            int count = enemies.Count;
-            Matrix4x4[] batchMatrices = new Matrix4x4[count];
-            Vector4[] enemyCols = new Vector4[count];
-
-            for (int i = 0; i < count; i++)
-            {
-                batchMatrices[i] = enemies[i].matrix;
-                enemyCols[i] = enemies[i].color;
-            }
-
-            enemyPropertyBlock.SetVectorArray("_Color", enemyCols);
-            enemyPropertyBlock.SetVectorArray("_ColorBottom", enemyCols); 
-            Graphics.DrawMeshInstanced(cubeMesh, 0, instancedMaterial, batchMatrices, count, enemyPropertyBlock); 
-        }
-    }
-
     public void DestroyEnemy(int enemyColliderId)
     {
         int index = enemies.FindIndex(e => e.colliderId == enemyColliderId);
         if (index != -1)
         {
-            Debug.Log($"[MANAGER] Destroying Enemy ID: {enemyColliderId}");
             CollisionManager.Instance.RemoveCollider(enemyColliderId);
             enemies.RemoveAt(index);
             enemyColliderIds.Remove(enemyColliderId);
         }
     }
 
-    void CreateCubeMesh()
-    {
-        cubeMesh = new Mesh();
-        cubeMesh.name = "ManagerCube";
+    #endregion
 
-        Vector3[] vertices = new Vector3[8]
+    #region Rendering & Bounds
+    private void RenderAll()
+    {
+        if (cubeMesh == null || instancedMaterial == null) return;
+
+        RenderPlatforms();
+        RenderEnemies();
+    }
+
+    private void RenderPlatforms()
+    {
+        int count = platforms.Count;
+        if (count == 0) return;
+
+        EnsurePlatformBuffers(count);
+
+        for (int i = 0; i < count; i++)
+        {
+            platformMatrices[i] = platforms[i].matrix;
+
+            if (platforms[i].type == PlatformType.Normal)
+            {
+                platformTopColors[i] = gradientStartColor;
+                platformBottomColors[i] = gradientEndColor;
+            }
+            else
+            {
+                platformTopColors[i] = platforms[i].color;
+                platformBottomColors[i] = platforms[i].color;
+            }
+        }
+
+        platformPropertyBlock.SetVectorArray("_Color", platformTopColors);
+        platformPropertyBlock.SetVectorArray("_ColorBottom", platformBottomColors);
+        Graphics.DrawMeshInstanced(cubeMesh, 0, instancedMaterial, platformMatrices, count, platformPropertyBlock);
+    }
+
+    private void RenderEnemies()
+    {
+        int count = enemies.Count;
+        if (count == 0) return;
+
+        EnsureEnemyBuffers(count);
+
+        for (int i = 0; i < count; i++)
+        {
+            enemyMatrices[i] = enemies[i].matrix;
+            enemyColorsBuffer[i] = enemies[i].color;
+        }
+
+        enemyPropertyBlock.SetVectorArray("_Color", enemyColorsBuffer);
+        enemyPropertyBlock.SetVectorArray("_ColorBottom", enemyColorsBuffer);
+        Graphics.DrawMeshInstanced(cubeMesh, 0, instancedMaterial, enemyMatrices, count, enemyPropertyBlock);
+    }
+
+    private void EnsurePlatformBuffers(int capacity)
+    {
+        if (platformMatrices == null || platformMatrices.Length < capacity)
+        {
+            platformMatrices = new Matrix4x4[capacity];
+            platformTopColors = new Vector4[capacity];
+            platformBottomColors = new Vector4[capacity];
+        }
+    }
+
+    private void EnsureEnemyBuffers(int capacity)
+    {
+        if (enemyMatrices == null || enemyMatrices.Length < capacity)
+        {
+            enemyMatrices = new Matrix4x4[capacity];
+            enemyColorsBuffer = new Vector4[capacity];
+        }
+    }
+
+    private void CheckPlayerVoidFall()
+    {
+        if (playerInstance != null && playerInstance.transform.position.y <= killYThreshold)
+        {
+            playerInstance.TakeDamage(9999f, "Void");
+        }
+    }
+
+    private void CreateCubeMesh()
+    {
+        cubeMesh = new Mesh { name = "ManagerCube" };
+
+        cubeMesh.vertices = new Vector3[8]
         {
             new Vector3(-0.5f, -0.5f, -0.5f),
             new Vector3(0.5f, -0.5f, -0.5f),
@@ -505,7 +654,7 @@ public class EnemyAndLevelManager : MonoBehaviour
             new Vector3(-0.5f, 0.5f, 0.5f)
         };
 
-        int[] triangles = new int[36]
+        cubeMesh.triangles = new int[36]
         {
             0, 4, 1, 1, 4, 5,
             2, 6, 3, 3, 6, 7,
@@ -515,28 +664,19 @@ public class EnemyAndLevelManager : MonoBehaviour
             4, 7, 5, 5, 7, 6
         };
 
-        cubeMesh.vertices = vertices;
-        cubeMesh.triangles = triangles;
         cubeMesh.RecalculateNormals();
         cubeMesh.RecalculateBounds();
     }
+    #endregion
 
+    #region Colliders
     public PlatformType GetPlatformType(int colliderId)
     {
-        if (platformColliderMap.TryGetValue(colliderId, out PlatformType type))
-        {
-            return type;
-        }
-        return PlatformType.Normal;
+        return platformColliderMap.TryGetValue(colliderId, out PlatformType type) ? type : PlatformType.Normal;
     }
 
-    public void SetPlayerID(int playerID)
-    {
-        cachedPlayerId = playerID;
-    }
+    public void SetPlayerID(int playerID) => cachedPlayerId = playerID;
 
-    public bool IsEnemyCollider(int colliderId)
-    {
-        return enemyColliderIds.Contains(colliderId);
-    }
+    public bool IsEnemyCollider(int colliderId) => enemyColliderIds.Contains(colliderId);
+    #endregion
 }

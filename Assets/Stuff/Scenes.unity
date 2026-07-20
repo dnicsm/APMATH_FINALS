@@ -26,7 +26,7 @@ RenderSettings:
   m_AmbientIntensity: 1
   m_AmbientMode: 0
   m_SubtractiveShadowColor: {r: 0.42, g: 0.478, b: 0.627, a: 1}
-  m_SkyboxMaterial: {fileID: 10304, guid: 0000000000000000f000000000000000, type: 0}
+  m_SkyboxMaterial: {fileID: 2100000, guid: 9e6d812421750ac4ebbea9f22e0f230e, type: 2}
   m_HaloStrength: 0.5
   m_FlareStrength: 1
   m_FlareFadeSpeed: 3
@@ -757,78 +757,315 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EnemyAndLevelManager
   instancedMaterial: {fileID: 2100000, guid: 22ccbb611338d93468b10c5648779cb2, type: 2}
   constantZPosition: 0
+  autoGenerateVoidFloor: 1
+  voidYOffset: 4
+  voidExtraWidth: 30
+  killYThreshold: -15
   customLevelDesign:
-  - localPosition: {x: 0, y: 0, z: 0}
-    scale: {x: 7, y: 1, z: 2}
+  - localPosition: {x: -1, y: 0, z: 0}
+    scale: {x: 7, y: 0.8, z: 2}
     type: 0
     travelOffset: {x: 0, y: 0, z: 0}
     travelSpeed: 0
     dropDelay: 0
     gravityScale: 0
     maxFallDistance: 0
-  - localPosition: {x: 5, y: 2, z: 1}
-    scale: {x: 0.5, y: 0.5, z: 1}
-    type: 2
+  - localPosition: {x: 7, y: 1, z: 0}
+    scale: {x: 5, y: 0.8, z: 2}
+    type: 0
     travelOffset: {x: 0, y: 0, z: 0}
     travelSpeed: 0
     dropDelay: 0
     gravityScale: 0
     maxFallDistance: 0
-  - localPosition: {x: 10, y: 1, z: 0}
-    scale: {x: 5, y: 1, z: 2}
+  - localPosition: {x: 12, y: 0, z: 0}
+    scale: {x: 3, y: 0.8, z: 2}
     type: 3
-    travelOffset: {x: 0, y: 9, z: 0}
-    travelSpeed: 1
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
     dropDelay: 0
     gravityScale: 0
     maxFallDistance: 0
-  - localPosition: {x: 10, y: 1, z: 0}
-    scale: {x: 5, y: 1, z: 2}
+  - localPosition: {x: 25, y: 0, z: 0}
+    scale: {x: 12, y: 0.8, z: 2}
     type: 0
     travelOffset: {x: 0, y: 0, z: 0}
     travelSpeed: 0
     dropDelay: 0
     gravityScale: 0
     maxFallDistance: 0
-  - localPosition: {x: -3, y: 6, z: 0}
-    scale: {x: 2, y: 1, z: 2}
-    type: 4
+  - localPosition: {x: 36, y: 1, z: 0}
+    scale: {x: 5, y: 0.8, z: 2}
+    type: 0
     travelOffset: {x: 0, y: 0, z: 0}
     travelSpeed: 0
-    dropDelay: 2
-    gravityScale: 9.8
-    maxFallDistance: 15
-  - localPosition: {x: -3, y: -10, z: 0}
-    scale: {x: 50, y: 1, z: 2}
-    type: 5
-    travelOffset: {x: 0, y: 0, z: 0}
-    travelSpeed: 0
-    dropDelay: 2
-    gravityScale: 9.8
-    maxFallDistance: 15
-  - localPosition: {x: 1.6, y: 1.81, z: 0}
-    scale: {x: 2, y: 1, z: 2}
+    dropDelay: 0
+    gravityScale: 0
+    maxFallDistance: 0
+  - localPosition: {x: 41, y: 1, z: 0}
+    scale: {x: 3, y: 0.8, z: 2}
+    type: 3
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 0
+    gravityScale: 0
+    maxFallDistance: 0
+  - localPosition: {x: 55, y: 1, z: 0}
+    scale: {x: 15, y: 0.8, z: 2}
+    type: 0
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 0
+    gravityScale: 0
+    maxFallDistance: 0
+  - localPosition: {x: 73, y: 0, z: 0}
+    scale: {x: 15, y: 0.8, z: 2}
+    type: 0
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 0
+    gravityScale: 0
+    maxFallDistance: 0
+  - localPosition: {x: 86, y: -1, z: 0}
+    scale: {x: 5, y: 0.8, z: 2}
+    type: 0
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 0
+    gravityScale: 0
+    maxFallDistance: 0
+  - localPosition: {x: 91, y: -1, z: 0}
+    scale: {x: 3, y: 0.8, z: 2}
+    type: 3
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 0
+    gravityScale: 0
+    maxFallDistance: 0
+  - localPosition: {x: 105, y: 0, z: 0}
+    scale: {x: 15, y: 0.8, z: 2}
+    type: 0
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 0
+    gravityScale: 0
+    maxFallDistance: 0
+  - localPosition: {x: 115, y: 0, z: 0}
+    scale: {x: 3, y: 0.8, z: 2}
+    type: 3
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 0
+    gravityScale: 0
+    maxFallDistance: 0
+  - localPosition: {x: 130, y: 0, z: 0}
+    scale: {x: 15, y: 0.8, z: 2}
+    type: 0
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 0
+    gravityScale: 0
+    maxFallDistance: 0
+  - localPosition: {x: 140, y: -1, z: 0}
+    scale: {x: 3, y: 0.8, z: 2}
+    type: 3
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 0
+    gravityScale: 0
+    maxFallDistance: 0
+  - localPosition: {x: 149, y: -1, z: 0}
+    scale: {x: 4, y: 0.8, z: 2}
+    type: 0
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 0
+    gravityScale: 0
+    maxFallDistance: 0
+  - localPosition: {x: 154, y: -1, z: 0}
+    scale: {x: 3, y: 0.8, z: 2}
+    type: 3
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 0
+    gravityScale: 0
+    maxFallDistance: 0
+  - localPosition: {x: 168, y: -1, z: 0}
+    scale: {x: 15, y: 0.8, z: 2}
+    type: 0
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 0
+    gravityScale: 0
+    maxFallDistance: 0
+  - localPosition: {x: 178, y: -1, z: 0}
+    scale: {x: 3, y: 0.8, z: 2}
+    type: 3
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 0
+    gravityScale: 0
+    maxFallDistance: 0
+  - localPosition: {x: 187, y: -1, z: 0}
+    scale: {x: 4, y: 0.8, z: 2}
+    type: 0
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 0
+    gravityScale: 0
+    maxFallDistance: 0
+  - localPosition: {x: 193, y: -1, z: 0}
+    scale: {x: 4, y: 0.8, z: 2}
     type: 6
-    travelOffset: {x: 0, y: 0, z: 0}
-    travelSpeed: 0
-    dropDelay: 2
-    gravityScale: 9.8
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 0
+    gravityScale: 0
+    maxFallDistance: 0
+  - localPosition: {x: 7, y: 14, z: 0}
+    scale: {x: 0.5, y: 0.5, z: 0.4}
+    type: 4
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 1
+    gravityScale: 6
     maxFallDistance: 15
-  gradientStartColor: {r: 0, g: 0, b: 1, a: 1}
-  gradientEndColor: {r: 0, g: 1, b: 1, a: 1}
-  spikeColor: {r: 0.4, g: 0.4, b: 0.45, a: 1}
-  lavaColor: {r: 1, g: 0.25, b: 0, a: 1}
-  movingPlatformColor: {r: 0, g: 1, b: 0, a: 1}
+  - localPosition: {x: 55, y: 14, z: 0}
+    scale: {x: 0.5, y: 0.5, z: 0.4}
+    type: 4
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 1
+    gravityScale: 6
+    maxFallDistance: 15
+  - localPosition: {x: 105, y: 14, z: 0}
+    scale: {x: 0.5, y: 0.5, z: 0.4}
+    type: 4
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 1
+    gravityScale: 6
+    maxFallDistance: 15
+  - localPosition: {x: 135, y: 14, z: 0}
+    scale: {x: 0.5, y: 0.5, z: 0.4}
+    type: 4
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 1
+    gravityScale: 6
+    maxFallDistance: 15
+  - localPosition: {x: 170, y: 14, z: 0}
+    scale: {x: 0.5, y: 0.5, z: 0.4}
+    type: 4
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 1
+    gravityScale: 6
+    maxFallDistance: 15
+  - localPosition: {x: 22, y: 0.5, z: 0}
+    scale: {x: 0.3, y: 0.3, z: 0.3}
+    type: 1
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 1
+    gravityScale: 6
+    maxFallDistance: 15
+  - localPosition: {x: 36, y: 1.5, z: 0}
+    scale: {x: 0.3, y: 0.3, z: 0.3}
+    type: 1
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 1
+    gravityScale: 6
+    maxFallDistance: 15
+  - localPosition: {x: 50, y: 1.5, z: 0}
+    scale: {x: 0.3, y: 0.3, z: 0.3}
+    type: 1
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 1
+    gravityScale: 6
+    maxFallDistance: 15
+  - localPosition: {x: 59, y: 1.5, z: 0}
+    scale: {x: 0.3, y: 0.3, z: 0.3}
+    type: 1
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 1
+    gravityScale: 6
+    maxFallDistance: 15
+  - localPosition: {x: 100, y: 0.5, z: 0}
+    scale: {x: 0.3, y: 0.3, z: 0.3}
+    type: 1
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 1
+    gravityScale: 6
+    maxFallDistance: 15
+  - localPosition: {x: 110, y: 0.5, z: 0}
+    scale: {x: 0.3, y: 0.3, z: 0.3}
+    type: 1
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 1
+    gravityScale: 6
+    maxFallDistance: 15
+  - localPosition: {x: 165, y: -0.5, z: 0}
+    scale: {x: 0.3, y: 0.3, z: 0.3}
+    type: 1
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 1
+    gravityScale: 6
+    maxFallDistance: 15
+  - localPosition: {x: 28, y: 0.5, z: 0}
+    scale: {x: 1, y: 0.3, z: 2}
+    type: 2
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 1
+    gravityScale: 6
+    maxFallDistance: 15
+  - localPosition: {x: 70, y: 0.5, z: 0}
+    scale: {x: 1, y: 0.3, z: 2}
+    type: 2
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 1
+    gravityScale: 6
+    maxFallDistance: 15
+  - localPosition: {x: 77, y: 0.5, z: 0}
+    scale: {x: 1, y: 0.3, z: 2}
+    type: 2
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 1
+    gravityScale: 6
+    maxFallDistance: 15
+  - localPosition: {x: 128, y: 0.5, z: 0}
+    scale: {x: 1, y: 0.3, z: 2}
+    type: 2
+    travelOffset: {x: 4, y: 0, z: 0}
+    travelSpeed: 0.5
+    dropDelay: 1
+    gravityScale: 6
+    maxFallDistance: 15
+  gradientStartColor: {r: 1, g: 1, b: 1, a: 1}
+  gradientEndColor: {r: 0.12452829, g: 0.12452829, b: 0.12452829, a: 1}
+  spikeColor: {r: 1, g: 0, b: 0, a: 1}
+  lavaColor: {r: 1, g: 0.464503, b: 0, a: 1}
+  movingPlatformColor: {r: 1, g: 1, b: 1, a: 1}
   dripstoneColor: {r: 0.5, g: 0.35, b: 0.25, a: 1}
-  voidColor: {r: 0.1, g: 0.05, b: 0.15, a: 0.5}
-  goalColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
-  enemyCount: 5
-  enemySpeed: 3
+  voidColor: {r: 0, g: 0, b: 0, a: 0.5}
+  goalColor: {r: 0.015686274, g: 1, b: 0.060913607, a: 1}
+  enemySpeed: 1
   enemyScale: {x: 0.5, y: 0.5, z: 0.5}
   enemyColors:
-  - {r: 1, g: 0, b: 0, a: 1}
+  - {r: 0, g: 0.24313726, b: 1, a: 1}
   - {r: 1, g: 0, b: 1, a: 1}
-  - {r: 1, g: 0.5, b: 0, a: 1}
+  - {r: 0.2509804, g: 0.8784314, b: 0.8156863, a: 1}
+  minPlatformWidthForEnemies: 8
+  maxEnemiesPerPlatform: 1
 --- !u!4 &1328765406
 Transform:
   m_ObjectHideFlags: 0
