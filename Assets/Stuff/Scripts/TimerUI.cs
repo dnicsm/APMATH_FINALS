@@ -5,7 +5,7 @@ using TMPro;
 public class TimerUI : MonoBehaviour
 {
     public TextMeshProUGUI timerText;
-    public float timerMinutes = 5f;
+    public float timerMinutes = 3f;
 
     private float timeRemaining;
     private bool isTimerRunning = false;

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
+using TMPro;
 
 public class Player : MonoBehaviour
 {
@@ -10,6 +11,7 @@ public class Player : MonoBehaviour
     public Image HealthBar;
     public Image LoseUI;
     public Image WinUI;
+    public TextMeshProUGUI PowerUpTimerText;
 
     [Header("Power-Up Durations")]
     public float powerUpDuration = 5f;
@@ -28,7 +30,7 @@ public class Player : MonoBehaviour
     public float MaxHealth = 5f;
     public float CurrentHealth;
 
-    private float baseSpeed = 5f;
+    private float baseSpeed = 10f;
     private float jumpForce = 15f;
     private float upwardGravity = 35f;
     private float downwardGravity = 15f;
@@ -80,11 +82,14 @@ public class Player : MonoBehaviour
 
         if (hasFireballPowerUp)
         {
+            PowerUpTimerText.gameObject.SetActive(true);
+            PowerUpTimerText.text = $"Fireball: {fireballActiveTimer:F1}s";
             fireballActiveTimer -= dt;
             if (fireballActiveTimer <= 0f)
             {
                 hasFireballPowerUp = false;
                 Debug.Log("[POWERUP] Fireball has expired!");
+                PowerUpTimerText.gameObject.SetActive(false);
             }
             else
             {
@@ -99,12 +104,15 @@ public class Player : MonoBehaviour
 
         if (!canTakeDamage || canKillEnemies)
         {
+            PowerUpTimerText.gameObject.SetActive(true);
+            PowerUpTimerText.text = $"Invincibility: {invincibilityActiveTimer:F1}s";
             invincibilityActiveTimer -= dt;
             if (invincibilityActiveTimer <= 0f)
             {
                 canTakeDamage = true;
                 canKillEnemies = false;
                 Debug.Log("[POWERUP] Invincibility has expired!");
+                PowerUpTimerText.gameObject.SetActive(false);
             }
         }
 

@@ -72,6 +72,10 @@ public class EnemyAndLevelManager : MonoBehaviour
     public Material instancedMaterial;
     public float constantZPosition = 1f;
 
+    [Header("Dot Product Settings")]
+    public float viewThreshold = 0.2f; 
+    public float maxRenderDistance = 30f;
+
     [Header("Void & Fall Settings")]
     public bool autoGenerateVoidFloor = true;
     public float voidYOffset = 4f;
@@ -119,9 +123,12 @@ public class EnemyAndLevelManager : MonoBehaviour
 
     private int cachedPlayerId = -1;
     private Player playerInstance;
+    private Camera mainCam;
 
     private void Start()
     {
+        mainCam = Camera.main;
+
         if (instancedMaterial != null && !instancedMaterial.enableInstancing)
         {
             instancedMaterial.enableInstancing = true;
@@ -556,6 +563,29 @@ public class EnemyAndLevelManager : MonoBehaviour
 
     #endregion
 
+    #region Dot Product Check
+    private bool IsPositionInCameraView(Vector3 targetPosition)
+    {
+        if (mainCam == null) mainCam = Camera.main;
+        if (mainCam == null) return true;
+
+        Vector3 camToTargetUnnormalized = targetPosition - mainCam.transform.position;
+        
+        float distanceSqr = camToTargetUnnormalized.sqrMagnitude;
+        if (distanceSqr > maxRenderDistance * maxRenderDistance)
+        {
+            return false;
+        }
+
+        Vector3 camToTarget = camToTargetUnnormalized.normalized;
+        Vector3 camForward = mainCam.transform.forward;
+
+        float dot = Vector3.Dot(camForward, camToTarget);
+
+        return dot > viewThreshold;
+    }
+    #endregion
+
     #region Rendering & Bounds
     private void RenderAll()
     {
@@ -572,25 +602,37 @@ public class EnemyAndLevelManager : MonoBehaviour
 
         EnsurePlatformBuffers(count);
 
+        int visibleCount = 0;
+
         for (int i = 0; i < count; i++)
         {
-            platformMatrices[i] = platforms[i].matrix;
+            if (!IsPositionInCameraView(platforms[i].currentPosition))
+            {
+                continue;
+            }
+
+            platformMatrices[visibleCount] = platforms[i].matrix;
 
             if (platforms[i].type == PlatformType.Normal)
             {
-                platformTopColors[i] = gradientStartColor;
-                platformBottomColors[i] = gradientEndColor;
+                platformTopColors[visibleCount] = gradientStartColor;
+                platformBottomColors[visibleCount] = gradientEndColor;
             }
             else
             {
-                platformTopColors[i] = platforms[i].color;
-                platformBottomColors[i] = platforms[i].color;
+                platformTopColors[visibleCount] = platforms[i].color;
+                platformBottomColors[visibleCount] = platforms[i].color;
             }
+
+            visibleCount++;
         }
 
-        platformPropertyBlock.SetVectorArray("_Color", platformTopColors);
-        platformPropertyBlock.SetVectorArray("_ColorBottom", platformBottomColors);
-        Graphics.DrawMeshInstanced(cubeMesh, 0, instancedMaterial, platformMatrices, count, platformPropertyBlock);
+        if (visibleCount > 0)
+        {
+            platformPropertyBlock.SetVectorArray("_Color", platformTopColors);
+            platformPropertyBlock.SetVectorArray("_ColorBottom", platformBottomColors);
+            Graphics.DrawMeshInstanced(cubeMesh, 0, instancedMaterial, platformMatrices, visibleCount, platformPropertyBlock);
+        }
     }
 
     private void RenderEnemies()
@@ -600,15 +642,26 @@ public class EnemyAndLevelManager : MonoBehaviour
 
         EnsureEnemyBuffers(count);
 
+        int visibleCount = 0;
+
         for (int i = 0; i < count; i++)
         {
-            enemyMatrices[i] = enemies[i].matrix;
-            enemyColorsBuffer[i] = enemies[i].color;
+            if (!IsPositionInCameraView(enemies[i].position))
+            {
+                continue;
+            }
+
+            enemyMatrices[visibleCount] = enemies[i].matrix;
+            enemyColorsBuffer[visibleCount] = enemies[i].color;
+            visibleCount++;
         }
 
-        enemyPropertyBlock.SetVectorArray("_Color", enemyColorsBuffer);
-        enemyPropertyBlock.SetVectorArray("_ColorBottom", enemyColorsBuffer);
-        Graphics.DrawMeshInstanced(cubeMesh, 0, instancedMaterial, enemyMatrices, count, enemyPropertyBlock);
+        if (visibleCount > 0)
+        {
+            enemyPropertyBlock.SetVectorArray("_Color", enemyColorsBuffer);
+            enemyPropertyBlock.SetVectorArray("_ColorBottom", enemyColorsBuffer);
+            Graphics.DrawMeshInstanced(cubeMesh, 0, instancedMaterial, enemyMatrices, visibleCount, enemyPropertyBlock);
+        }
     }
 
     private void EnsurePlatformBuffers(int capacity)
